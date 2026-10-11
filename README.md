@@ -81,16 +81,13 @@ python tests/smoke_handlers.py   # прогон всех сценариев на
 
 ## Деплой на Render.com (бесплатно, 24/7)
 
-1. Залей проект в репозиторий GitHub.
-2. На [render.com](https://render.com) → **New → Blueprint** → выбери репозиторий
-   (Render сам прочитает `render.yaml`).
-3. Впиши `BOT_TOKEN` и `GEMINI_API_KEY` в разделе Environment.
-4. Deploy.
+💡 **Пошаговая инструкция со скриншотами текстом — в `DEPLOY.md`.** Коротко:
 
-⚠️ На бесплатном тарифе Render усыпляет сервис после 15 минут без HTTP-запросов.
-Чтобы бот не засыпал, заведи бесплатный монитор на [uptimerobot.com](https://uptimerobot.com):
-тип **HTTP(s)**, адрес `https://ТВОЙ-СЕРВИС.onrender.com/health`, интервал 5 минут.
-Бот отдаёт `OK` по `/` и `/health`.
+1. Создай пустой репозиторий `bju-bot` на GitHub (без README).
+2. Подключи проект и запушь: `git push -u origin main` (пароль = токен GitHub с правами `repo`).
+3. На render.com → **New → Blueprint** → выбери репозиторий → в Environment впиши `BOT_TOKEN` и `GEMINI_API_KEY`.
+4. Проверка: `https://bju-bot.onrender.com/health` → `OK`.
+5. Чтобы бот не засыпал: UptimeRobot-монитор на `/health` каждые 5 минут.
 
 ## Как пополнять базу
 
