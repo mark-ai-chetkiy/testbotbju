@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0e9f6e">
+  <title>БЖУ и Тамагочи</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="title">🥗 БЖУ и Тамагочи</div>
+      <div class="subtitle" id="header-sub">Бесплатно · без регистрации</div>
+    </div>
+    <div class="pet-chip" id="pet-chip">🥚 <span>Lv.1</span></div>
+  </header>
+
+  <main>
+    <section class="tab active" id="tab-calc">
+      <div class="card">
+        <label class="label" for="search">Найти продукт</label>
+        <input id="search" type="search" placeholder="Например: гречка, курица, творог" autocomplete="off">
+        <p class="hint">Введи название и выбери продукт — посчитаем БЖУ на нужную порцию.</p>
+      </div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <section class="tab" id="tab-diary">
+      <div class="card" id="diary-summary"></div>
+      <div class="section-head">
+        <h2>Сегодня</h2>
+        <button class="link-btn" id="clear-day">Очистить</button>
+      </div>
+      <div id="diary-list" class="list"></div>
+      <div class="section-head"><h2>Последние 7 дней</h2></div>
+      <div id="history" class="list"></div>
+    </section>
+
+    <section class="tab" id="tab-pet">
+      <div id="pet-card"></div>
+    </section>
+
+    <section class="tab" id="tab-recipes">
+      <div class="card">
+        <label class="label" for="recipe-search">Рецепты (35)</label>
+        <input id="recipe-search" type="search" placeholder="Найти рецепт" autocomplete="off">
+      </div>
+      <div id="recipes-list" class="list"></div>
+    </section>
+
+    <section class="tab" id="tab-profile">
+      <div class="card">
+        <h2>Моя норма</h2>
+        <p class="hint">Считаем по формуле Миффлина — Сан Жеора. Данные остаются только на твоём телефоне.</p>
+        <form id="profile-form">
+          <div class="row">
+            <div class="field">
+              <label class="label" for="gender">Пол</label>
+              <select id="gender">
+                <option value="m">Мужской</option>
+                <option value="f" selected>Женский</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label" for="age">Возраст</label>
+              <input id="age" type="number" min="14" max="100" value="30" required>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label class="label" for="height">Рост, см</label>
+              <input id="height" type="number" min="120" max="230" value="170" required>
+            </div>
+            <div class="field">
+              <label class="label" for="weight">Вес, кг</label>
+              <input id="weight" type="number" min="30" max="250" step="0.1" value="70" required>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="activity">Активность</label>
+            <select id="activity">
+              <option value="1">🪑 Минимальная (сидячая работа)</option>
+              <option value="2">🚶 Лёгкая (1–3 тренировки в неделю)</option>
+              <option value="3" selected>🏃 Средняя (3–5 тренировок в неделю)</option>
+              <option value="4">🏋️ Высокая (6–7 тренировок в неделю)</option>
+              <option value="5">🔥 Очень высокая</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="goal">Цель</label>
+            <select id="goal">
+              <option value="lose">🔥 Похудение</option>
+              <option value="keep" selected>⚖️ Поддержка</option>
+              <option value="gain">💪 Набор массы</option>
+            </select>
+          </div>
+          <button class="primary" type="submit">Сохранить норму</button>
+        </form>
+      </div>
+      <div class="card" id="target-card"></div>
+      <div class="card">
+        <div class="section-head"><h2>Имя питомца</h2></div>
+        <div class="row">
+          <input id="pet-name" type="text" maxlength="20" placeholder="Тёма">
+          <button class="primary small" id="save-pet-name">Сохранить</button>
+        </div>
+      </div>
+      <p class="footer-note" id="source-note"></p>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button data-tab="calc" class="active"><span>🔍</span>БЖУ</button>
+    <button data-tab="diary"><span>📓</span>Дневник</button>
+    <button data-tab="pet"><span>🐣</span>Питомец</button>
+    <button data-tab="recipes"><span>🍽</span>Рецепты</button>
+    <button data-tab="profile"><span>⚙️</span>Профиль</button>
+  </nav>
+
+  <div class="overlay" id="portion-overlay" hidden>
+    <div class="sheet">
+      <h2 id="portion-title">Продукт</h2>
+      <div class="row">
+        <div class="field">
+          <label class="label" for="grams">Вес, г</label>
+          <input id="grams" type="number" min="1" max="5000" value="100">
+        </div>
+        <div class="chips">
+          <button data-grams="50">50</button>
+          <button data-grams="100">100</button>
+          <button data-grams="150">150</button>
+          <button data-grams="200">200</button>
+        </div>
+      </div>
+      <div class="macro-preview" id="portion-preview"></div>
+      <div class="row actions">
+        <button class="primary" id="add-to-diary">В дневник</button>
+        <button class="ghost" id="cancel-portion">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
