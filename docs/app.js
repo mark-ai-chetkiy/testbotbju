@@ -7,6 +7,8 @@
     profile: "bju_profile_v1",
     petName: "bju_pet_name_v1",
     source: "bju_source_v1",
+    club: "bju_club_v1",
+    checkins: "bju_checkins_v1",
   };
 
   const ACTIVITY = {
@@ -30,6 +32,7 @@
   const tg = window.Telegram && window.Telegram.WebApp;
   const state = {
     products: [], recipes: [], diary: [], profile: null,
+    club: null, checkins: [],
     petName: "Тёма", source: "", selected: null, tab: "calc",
   };
 
@@ -199,6 +202,12 @@
     });
     xp += Math.min(5 * streak, 50);
 
+    // Чекины в зале тоже кормят питомца: +15 XP за визит, +5 если в тот же день был дневник.
+    (state.checkins || []).forEach((day) => {
+      xp += 15;
+      if (days[day] && days[day].items) xp += 5;
+    });
+
     const li = levelInfo(xp);
     const tdy = days[today] || { items: 0, protein: 0, fat: 0, calories: 0 };
     const m = moodFor(tdy, target);
@@ -206,6 +215,42 @@
       xp: xp, level: li.level, into: li.into, need: li.need,
       stage: stageFor(li.level), streak: streak, best: best,
       today: tdy, target: target, mood: m,
+    };
+  }
+
+  /* ---- club challenge ---- */
+  function clubStats() {
+    const club = state.club || { name: "Мой зал", days: 30, start: dayKey() };
+    const days = groupDays();
+    const visited = {};
+    (state.checkins || []).forEach((d) => { visited[d] = true; });
+    const today = dayKey();
+    const start = dateFromKey(club.start);
+    const now = dateFromKey(today);
+    const total = Number(club.days) || 30;
+    const elapsed = Math.max(1, Math.min(total, Math.round((now - start) / 86400000) + 1));
+
+    let done = 0, visits = 0, logged = 0;
+    for (let i = 0; i < elapsed; i++) {
+      const key = shiftDay(club.start, i);
+      const hasVisit = !!visited[key];
+      const hasLog = !!(days[key] && days[key].items);
+      if (hasVisit) visits += 1;
+      if (hasLog) logged += 1;
+      if (hasVisit || hasLog) done += 1;
+    }
+
+    let cur = today;
+    const active = (key) => !!visited[key] || !!(days[key] && days[key].items);
+    if (!active(cur)) cur = shiftDay(cur, -1);
+    let streak = 0;
+    while (active(cur)) { streak += 1; cur = shiftDay(cur, -1); }
+
+    return {
+      club: club, elapsed: elapsed, total: total, done: done,
+      visits: visits, logged: logged, streak: streak,
+      pct: elapsed ? Math.round(done / elapsed * 100) : 0,
+      checkedToday: !!visited[today],
     };
   }
 
@@ -332,7 +377,7 @@
       '<div class="stat-box"><div class="stat-value">' + s.streak + '</div><div class="stat-label">стрик, дней</div></div>' +
       '<div class="stat-box"><div class="stat-value">' + s.best + '</div><div class="stat-label">лучший стрик</div></div>' +
       '<div class="stat-box"><div class="stat-value">' + s.xp + '</div><div class="stat-label">всего XP</div></div></div>' +
-      '<p class="hint">Питомец растёт от записей в дневнике: +5 XP за порцию, бонусы за день в цели и за серию дней.</p></div>';
+      '<p class="hint">Питомец растёт от записей в дневнике и чекинов в зале: +5 XP за порцию, +15 XP за визит в зал, бонусы за день в цели и за серию дней.</p></div>';
   }
 
   function renderRecipes() {
@@ -376,8 +421,87 @@
     }
   }
 
+  function renderClub() {
+    const s = clubStats();
+    const box = $("club-card");
+    box.innerHTML =
+      '<div class="card">' +
+        '<h2>🏋️ Челлендж клуба</h2>' +
+        '<p class="hint">Прогресс хранится на этом устройстве. Покажи результат тренеру — он засчитает его в клубе.</p>' +
+        '<div class="field"><label class="label" for="club-name">Название клуба</label>' +
+        '<input id="club-name" type="text" maxlength="30" value="' + esc(s.club.name) + '"></div>' +
+        '<div class="field"><label class="label" for="club-days">Длительность челленджа</label>' +
+        '<select id="club-days">' +
+          [7, 14, 30, 60].map((n) => '<option value="' + n + '"' +
+            (s.total === n ? " selected" : "") + '>' + n + ' дней</option>').join("") +
+        '</select></div>' +
+        '<button class="primary" id="save-club">Сохранить настройки</button>' +
+      '</div>' +
+      '<div class="card">' +
+        '<h2>День ' + s.elapsed + ' из ' + s.total + '</h2>' +
+        progress("Успешных дней", s.done, s.elapsed) +
+        '<div class="stat-grid">' +
+          '<div class="stat-box"><div class="stat-value">' + s.visits + '</div><div class="stat-label">тренировок</div></div>' +
+          '<div class="stat-box"><div class="stat-value">' + s.logged + '</div><div class="stat-label">дней с дневником</div></div>' +
+          '<div class="stat-box"><div class="stat-value">' + s.streak + '</div><div class="stat-label">серия, дней</div></div>' +
+        '</div>' +
+        '<p class="hint">Успешным считается день с чекином в зале или записью в дневнике. Серия — подряд, считая сегодня или вчера.</p>' +
+      '</div>' +
+      '<div class="card">' +
+        '<button class="primary" id="checkin">' +
+          (s.checkedToday ? "✅ Ты уже в зале сегодня — нажми, чтобы отменить" : "🏋️ Я в зале — отметить тренировку") +
+        '</button>' +
+        '<p class="hint">За каждый визит питомец получает +15 XP, а если в этот день есть запись в дневнике — ещё +5.</p>' +
+        '<div class="row actions">' +
+          '<button class="ghost" id="share-club">Поделиться</button>' +
+          '<button class="ghost" id="reset-club">Заново</button>' +
+        '</div>' +
+      '</div>';
+
+    $("save-club").addEventListener("click", () => {
+      state.club = {
+        name: $("club-name").value.trim().slice(0, 30) || "Мой зал",
+        days: Number($("club-days").value) || 30,
+        start: (state.club && state.club.start) || dayKey(),
+      };
+      save(KEYS.club, state.club);
+      renderAll();
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+    });
+    $("checkin").addEventListener("click", () => {
+      const today = dayKey();
+      const i = state.checkins.indexOf(today);
+      if (i === -1) state.checkins.push(today);
+      else state.checkins.splice(i, 1);
+      save(KEYS.checkins, state.checkins);
+      renderAll();
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+    });
+    $("reset-club").addEventListener("click", () => {
+      if (!window.confirm("Начать челлендж заново? Отметки тренировок будут очищены.")) return;
+      state.checkins = [];
+      state.club = { name: (state.club && state.club.name) || "Мой зал", days: (state.club && state.club.days) || 30, start: dayKey() };
+      save(KEYS.checkins, state.checkins);
+      save(KEYS.club, state.club);
+      renderAll();
+    });
+    $("share-club").addEventListener("click", () => {
+      const text = "🏋️ Челлендж «" + s.club.name + "»: день " + s.elapsed + "/" + s.total +
+        ", тренировок " + s.visits + ", серия " + s.streak + " дн. Считаю БЖУ в @GymTamagotchi_bot";
+      const url = "https://t.me/GymTamagotchi_bot?startapp=channel";
+      if (tg && tg.openTelegramLink) {
+        tg.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(url) + "&text=" + encodeURIComponent(text));
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(text + " " + url);
+        window.alert("Результат скопирован");
+      } else {
+        window.prompt("Скопируй результат:", text + " " + url);
+      }
+    });
+  }
+
   function renderAll() {
-    renderResults(); renderDiary(); renderPet(); renderProfile(); renderRecipes();
+    renderResults(); renderDiary(); renderPet(); renderClub(); renderProfile(); renderRecipes();
     renderPortionPreview();
   }
 
@@ -460,6 +584,8 @@
     }
     state.diary = load(KEYS.diary, []);
     state.profile = load(KEYS.profile, null);
+    state.club = load(KEYS.club, null);
+    state.checkins = load(KEYS.checkins, []);
     state.petName = load(KEYS.petName, "Тёма");
 
     try {

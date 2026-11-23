@@ -215,11 +215,11 @@ input[type="number"] { -moz-appearance: textfield; }
   border: none;
   background: none;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   padding: 4px 0;
   cursor: pointer;
 }
-.bottom-nav button span { display: block; font-size: 21px; line-height: 1.2; }
+.bottom-nav button span { display: block; font-size: 19px; line-height: 1.2; }
 .bottom-nav button.active { color: var(--accent); font-weight: 700; }
 
 .overlay {
