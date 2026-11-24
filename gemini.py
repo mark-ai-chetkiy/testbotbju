@@ -12,14 +12,10 @@ log = logging.getLogger("gemini")
 URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
        "{model}:generateContent?key={key}")
 
-# Если основная модель перегружена или недоступна, пробуем запасные.
-FALLBACK_MODELS = (
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.8-flash-lite",
-    "gemini-3.5-pro",
-    "gemini-3.8-pro",
-)
+# Рабочие модели: 3.8-flash часто перегружена, поэтому идём сразу через 3.5.
+PRIMARY_MODELS = ("gemini-3.5-flash-lite", "gemini-3.5-flash")
+FALLBACK_MODELS = ("gemini-3.8-flash",)
+
 
 PROMPT = (
     "Ты — нутрициолог. Определи блюда и продукты на фото. "
@@ -32,24 +28,12 @@ PROMPT = (
 )
 
 
-async def probe_models() -> list[dict]:
-    """Временная диагностика: какие модели доступны для этого ключа."""
-    payload = {
-        "contents": [{"parts": [{"text": "Ответь одним словом: OK"}]}],
-        "generationConfig": {"maxOutputTokens": 10},
-    }
-    models = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
-    timeout = aiohttp.ClientTimeout(total=30)
-    out = []
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        for model in models:
-            try:
-                items = await _generate(session, model, payload)
-                out.append({"model": model, "ok": True, "answer": items[:1]})
-            except Exception as exc:
-                out.append({"model": model, "ok": False,
-                            "error": str(exc)[:180]})
-    return out
+def _model_order() -> list[str]:
+    models = list(PRIMARY_MODELS)
+    for model in (GEMINI_MODEL,) + FALLBACK_MODELS:
+        if model not in models:
+            models.append(model)
+    return models
 
 
 async def _generate(session: aiohttp.ClientSession, model: str,
@@ -81,7 +65,7 @@ async def recognize(image_bytes: bytes, mime: str = "image/jpeg") -> list[dict]:
             "temperature": 0.2,
         },
     }
-    models = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
+    models = _model_order()
     timeout = aiohttp.ClientTimeout(total=90)
     last_error = "неизвестная ошибка"
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -89,7 +73,7 @@ async def recognize(image_bytes: bytes, mime: str = "image/jpeg") -> list[dict]:
             try:
                 items = await _generate(session, model, payload)
                 if items:
-                    if model != GEMINI_MODEL:
+                    if model != PRIMARY_MODELS[0]:
                         log.info("Фото распознано моделью %s", model)
                     return items
                 last_error = "модель вернула пустой результат"
