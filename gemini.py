@@ -14,10 +14,11 @@ URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
 
 # Если основная модель перегружена или недоступна, пробуем запасные.
 FALLBACK_MODELS = (
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-1.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.8-flash-lite",
+    "gemini-3.5-pro",
+    "gemini-3.8-pro",
 )
 
 PROMPT = (
