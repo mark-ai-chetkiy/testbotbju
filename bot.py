@@ -64,6 +64,10 @@ async def recognize(request: web.Request) -> web.Response:
         )
 
 
+async def debug_models(request: web.Request) -> web.Response:
+    return web.json_response({"models": await gemini.probe_models()}, headers=CORS)
+
+
 async def main():
     if not config.BOT_TOKEN:
         raise SystemExit("BOT_TOKEN не задан — заполни файл .env")
@@ -79,6 +83,7 @@ async def main():
     app.router.add_get("/", health)
     app.router.add_get("/health", health)
     app.router.add_route("*", "/api/recognize", recognize)
+    app.router.add_get("/api/debug-models", debug_models)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", config.PORT)

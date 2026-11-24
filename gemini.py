@@ -31,6 +31,26 @@ PROMPT = (
 )
 
 
+async def probe_models() -> list[dict]:
+    """Временная диагностика: какие модели доступны для этого ключа."""
+    payload = {
+        "contents": [{"parts": [{"text": "Ответь одним словом: OK"}]}],
+        "generationConfig": {"maxOutputTokens": 10},
+    }
+    models = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
+    timeout = aiohttp.ClientTimeout(total=30)
+    out = []
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        for model in models:
+            try:
+                items = await _generate(session, model, payload)
+                out.append({"model": model, "ok": True, "answer": items[:1]})
+            except Exception as exc:
+                out.append({"model": model, "ok": False,
+                            "error": str(exc)[:180]})
+    return out
+
+
 async def _generate(session: aiohttp.ClientSession, model: str,
                     payload: dict) -> list[dict]:
     url = URL.format(model=model, key=GEMINI_API_KEY)
