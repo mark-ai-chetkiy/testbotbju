@@ -1,13 +1,24 @@
 import base64
 import json
+import logging
 import re
 
 import aiohttp
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 
+log = logging.getLogger("gemini")
+
 URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
        "{model}:generateContent?key={key}")
+
+# Если основная модель перегружена или недоступна, пробуем запасные.
+FALLBACK_MODELS = (
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-1.5-flash",
+)
 
 PROMPT = (
     "Ты — нутрициолог. Определи блюда и продукты на фото. "
@@ -18,6 +29,19 @@ PROMPT = (
     '"carbs": 40, "calories": 470}] '
     "Без пояснений, без markdown, только JSON."
 )
+
+
+async def _generate(session: aiohttp.ClientSession, model: str,
+                    payload: dict) -> list[dict]:
+    url = URL.format(model=model, key=GEMINI_API_KEY)
+    async with session.post(url, json=payload) as resp:
+        data = await resp.json()
+        if resp.status != 200:
+            msg = data.get("error", {}).get("message", f"HTTP {resp.status}")
+            raise RuntimeError(str(msg)[:200])
+        parts = data["candidates"][0].get("content", {}).get("parts", [])
+        text = "\n".join(p["text"] for p in parts if p.get("text"))
+    return _parse(text)
 
 
 async def recognize(image_bytes: bytes, mime: str = "image/jpeg") -> list[dict]:
@@ -36,17 +60,22 @@ async def recognize(image_bytes: bytes, mime: str = "image/jpeg") -> list[dict]:
             "temperature": 0.2,
         },
     }
-    url = URL.format(model=GEMINI_MODEL, key=GEMINI_API_KEY)
+    models = [GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != GEMINI_MODEL]
     timeout = aiohttp.ClientTimeout(total=90)
+    last_error = "неизвестная ошибка"
     async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.post(url, json=payload) as resp:
-            data = await resp.json()
-            if resp.status != 200:
-                msg = data.get("error", {}).get("message", f"HTTP {resp.status}")
-                raise RuntimeError(f"Ошибка Gemini: {msg}")
-            parts = data["candidates"][0].get("content", {}).get("parts", [])
-            text = "\n".join(p["text"] for p in parts if p.get("text"))
-    return _parse(text)
+        for model in models:
+            try:
+                items = await _generate(session, model, payload)
+                if items:
+                    if model != GEMINI_MODEL:
+                        log.info("Фото распознано моделью %s", model)
+                    return items
+                last_error = "модель вернула пустой результат"
+            except Exception as exc:
+                last_error = str(exc)
+            log.warning("Модель %s не сработала: %s", model, last_error)
+    raise RuntimeError("Сервис распознавания временно недоступен: " + last_error)
 
 
 def _parse(text: str) -> list[dict]:

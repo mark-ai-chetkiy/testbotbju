@@ -311,9 +311,14 @@
       if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
     } catch (e) {
       state.aiItems = [];
-      box.innerHTML = '<p class="ai-error">Не получилось посчитать фото: ' + esc(e.message || e) +
+      const msg = String(e.message || e);
+      const text = /временно недоступен|high demand|overload|rate limit|429|503/i.test(msg)
+        ? "Сервис распознавания сейчас перегружен. Попробуй ещё раз через минуту."
+        : "Не получилось посчитать фото. Проверь, что на снимке видна еда, и попробуй снова.";
+      box.innerHTML = '<p class="ai-error">' + text +
         '</p><button class="primary" id="ai-retry">Попробовать другое фото</button>';
       $("ai-retry").addEventListener("click", () => $("ai-file").click());
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("error");
     }
   }
 
