@@ -67,7 +67,7 @@ async def recognize(image_bytes: bytes, mime: str = "image/jpeg") -> list[dict]:
     }
     models = _model_order()
     timeout = aiohttp.ClientTimeout(total=90)
-    last_error = "неизвестная ошибка"
+    errors = []
     async with aiohttp.ClientSession(timeout=timeout) as session:
         for model in models:
             try:
@@ -76,11 +76,13 @@ async def recognize(image_bytes: bytes, mime: str = "image/jpeg") -> list[dict]:
                     if model != PRIMARY_MODELS[0]:
                         log.info("Фото распознано моделью %s", model)
                     return items
-                last_error = "модель вернула пустой результат"
+                error = "модель вернула пустой результат"
             except Exception as exc:
-                last_error = str(exc)
-            log.warning("Модель %s не сработала: %s", model, last_error)
-    raise RuntimeError("Сервис распознавания временно недоступен: " + last_error)
+                error = str(exc)
+            errors.append(model + ": " + error[:120])
+            log.warning("Модель %s не сработала: %s", model, error)
+    raise RuntimeError("Сервис распознавания временно недоступен: " +
+                       " | ".join(errors))
 
 
 def _parse(text: str) -> list[dict]:
