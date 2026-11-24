@@ -100,6 +100,12 @@ input[type="number"] { -moz-appearance: textfield; }
   margin: 18px 2px 8px;
 }
 .section-head h2 { margin: 0; font-size: 16px; }
+.ai-head { margin: 0 0 8px; }
+.ai-head .label { margin-bottom: 0; }
+.ai-loading { color: var(--accent); font-size: 13px; padding: 6px 0; }
+.ai-error { color: var(--danger); font-size: 13px; }
+.ai-item { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.ai-item:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 
 .link-btn {
   border: none;

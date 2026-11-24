@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 
 from aiogram import Dispatcher
@@ -10,6 +11,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 import config
 import db
+import gemini
 from handlers import register_all
 
 logging.basicConfig(
@@ -21,6 +23,45 @@ log = logging.getLogger("bot")
 
 async def health(request: web.Request) -> web.Response:
     return web.Response(text="OK")
+
+
+CORS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+}
+
+
+async def recognize(request: web.Request) -> web.Response:
+    """Распознавание еды по фото для статической Mini App.
+
+    Ключ Gemini остаётся на сервере: во фронтенд он не попадает.
+    На холодный старт Render приложение подготавливает сервис заранее,
+    но первый запрос после простоя всё равно может занять ~40 секунд.
+    """
+    if request.method == "OPTIONS":
+        return web.Response(status=204, headers=CORS)
+
+    try:
+        data = await request.json()
+        raw = str(data.get("image") or "")
+        if "," in raw:  # data:image/jpeg;base64,...
+            raw = raw.split(",", 1)[1]
+        image_bytes = base64.b64decode(raw, validate=True)
+        if not image_bytes or len(image_bytes) > 8_000_000:
+            raise ValueError("Слишком большое или пустое изображение")
+
+        mime = str(data.get("mime") or "image/jpeg")
+        if mime not in ("image/jpeg", "image/png", "image/webp"):
+            mime = "image/jpeg"
+
+        items = await gemini.recognize(image_bytes, mime)
+        return web.json_response({"items": items}, headers=CORS)
+    except Exception as exc:
+        log.exception("Не удалось распознать фото")
+        return web.json_response(
+            {"error": str(exc)[:200]}, status=500, headers=CORS,
+        )
 
 
 async def main():
@@ -37,6 +78,7 @@ async def main():
     app = web.Application()
     app.router.add_get("/", health)
     app.router.add_get("/health", health)
+    app.router.add_route("*", "/api/recognize", recognize)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", config.PORT)

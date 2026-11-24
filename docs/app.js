@@ -11,6 +11,10 @@
     checkins: "bju_checkins_v1",
   };
 
+  // Фото-ИИ работает через уже задеплоенный бот: ключ Gemini остаётся на сервере.
+  const AI_ENDPOINT = "https://bju-bot-cnjz.onrender.com/api/recognize";
+  const AI_WARMUP = "https://bju-bot-cnjz.onrender.com/health";
+
   const ACTIVITY = {
     1: 1.20, 2: 1.375, 3: 1.55, 4: 1.725, 5: 1.90,
   };
@@ -32,7 +36,7 @@
   const tg = window.Telegram && window.Telegram.WebApp;
   const state = {
     products: [], recipes: [], diary: [], profile: null,
-    club: null, checkins: [],
+    club: null, checkins: [], aiItems: [],
     petName: "Тёма", source: "", selected: null, tab: "calc",
   };
 
@@ -216,6 +220,101 @@
       stage: stageFor(li.level), streak: streak, best: best,
       today: tdy, target: target, mood: m,
     };
+  }
+
+  /* ---- AI photo recognition ---- */
+  function renderAiResult() {
+    const box = $("ai-result");
+    const items = state.aiItems || [];
+    if (!items.length) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = '<h2>🤖 Что увидел ИИ</h2>' +
+      '<p class="hint">Проверь порции — ИИ может ошибаться. Нажми на блюдо, чтобы добавить в дневник.</p>' +
+      items.map((it, i) =>
+        '<div class="ai-item"><div class="result-name">' + esc(it.name) + '</div>' +
+        '<div class="result-meta">' + fmt(it.grams) + ' г · ИИ-оценка порции</div>' +
+        '<div class="macro-row">' +
+          '<span class="macro-pill">Б ' + fmt(it.protein) + ' г</span>' +
+          '<span class="macro-pill">Ж ' + fmt(it.fat) + ' г</span>' +
+          '<span class="macro-pill">У ' + fmt(it.carbs) + ' г</span>' +
+          '<span class="macro-pill k">' + fmt(it.calories) + ' ккал</span>' +
+        '</div><button class="link-btn" data-ai-add="' + i + '">＋ В дневник</button></div>').join("") +
+      '<button class="primary" id="ai-add-all">Добавить всё в дневник</button>';
+
+    box.querySelectorAll("[data-ai-add]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const it = state.aiItems[Number(el.dataset.aiAdd)];
+        addAiItems([it]);
+      });
+    });
+    $("ai-add-all").addEventListener("click", () => addAiItems(state.aiItems.slice()));
+  }
+
+  function addAiItems(items) {
+    const copy = items.slice();
+    state.aiItems = [];
+    renderAiResult();
+    copy.forEach((it) => addEntry(
+      it.name, it.grams,
+      { p: it.protein, f: it.fat, c: it.carbs, k: it.calories }
+    ));
+  }
+
+  function fileToJpegDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const max = 1600;
+          let w = img.width || max, h = img.height || max;
+          const scale = Math.min(1, max / Math.max(w, h));
+          w = Math.round(w * scale); h = Math.round(h * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.8));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleAiFile(file) {
+    if (!file) return;
+    const box = $("ai-result");
+    state.aiItems = [];
+    box.hidden = false;
+    box.innerHTML = '<div class="ai-loading">🔍 Анализирую фото… при первом запросе сервис может просыпаться до минуты.</div>';
+    try {
+      const dataUrl = await fileToJpegDataUrl(file);
+      const resp = await fetch(AI_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl, mime: "image/jpeg" }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) throw new Error(data.error || "Ошибка сервиса");
+      state.aiItems = (data.items || []).map((it) => ({
+        name: String(it.name || "Блюдо").slice(0, 80),
+        grams: Number(it.grams) || 100,
+        protein: Number(it.protein) || 0,
+        fat: Number(it.fat) || 0,
+        carbs: Number(it.carbs) || 0,
+        calories: Number(it.calories) || 0,
+      }));
+      if (!state.aiItems.length) throw new Error("Не удалось распознать блюдо на фото");
+      renderAiResult();
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+    } catch (e) {
+      state.aiItems = [];
+      box.innerHTML = '<p class="ai-error">Не получилось посчитать фото: ' + esc(e.message || e) +
+        '</p><button class="primary" id="ai-retry">Попробовать другое фото</button>';
+      $("ai-retry").addEventListener("click", () => $("ai-file").click());
+    }
   }
 
   /* ---- club challenge ---- */
@@ -502,7 +601,7 @@
 
   function renderAll() {
     renderResults(); renderDiary(); renderPet(); renderClub(); renderProfile(); renderRecipes();
-    renderPortionPreview();
+    renderAiResult(); renderPortionPreview();
   }
 
   function setTab(name) {
@@ -528,6 +627,12 @@
       el.addEventListener("click", () => setTab(el.dataset.tab));
     });
     $("search").addEventListener("input", renderResults);
+    $("ai-photo-btn").addEventListener("click", () => $("ai-file").click());
+    $("ai-file").addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      handleAiFile(file);
+    });
     $("recipe-search").addEventListener("input", renderRecipes);
     $("grams").addEventListener("input", renderPortionPreview);
     $("portion-overlay").addEventListener("click", (e) => {
@@ -582,6 +687,10 @@
     } else {
       state.source = load(KEYS.source, "");
     }
+
+    // Разогреваем сервис фото-ИИ заранее: холодный старт Render не будет заметен.
+    fetch(AI_WARMUP, { mode: "no-cors", cache: "no-store" }).catch(() => {});
+
     state.diary = load(KEYS.diary, []);
     state.profile = load(KEYS.profile, null);
     state.club = load(KEYS.club, null);

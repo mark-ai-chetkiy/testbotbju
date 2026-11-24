@@ -20,10 +20,15 @@
   <main>
     <section class="tab active" id="tab-calc">
       <div class="card">
-        <label class="label" for="search">Найти продукт</label>
+        <div class="section-head ai-head">
+          <label class="label" for="search">Найти продукт</label>
+          <button class="link-btn" id="ai-photo-btn">📷 Рассчитать по фото</button>
+        </div>
         <input id="search" type="search" placeholder="Например: гречка, курица, творог" autocomplete="off">
-        <p class="hint">Введи название и выбери продукт — посчитаем БЖУ на нужную порцию.</p>
+        <p class="hint">Введи название и выбери продукт — посчитаем БЖУ на нужную порцию. Или сфотографируй тарелку — ИИ оценит порцию сам.</p>
+        <input id="ai-file" type="file" accept="image/*" capture="environment" hidden>
       </div>
+      <div id="ai-result" class="card" hidden></div>
       <div id="results" class="results"></div>
     </section>
 
