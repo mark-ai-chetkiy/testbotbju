@@ -81,8 +81,7 @@ async def recognize(image_bytes: bytes, mime: str = "image/jpeg") -> list[dict]:
                 error = str(exc)
             errors.append(model + ": " + error[:120])
             log.warning("Модель %s не сработала: %s", model, error)
-    raise RuntimeError("Сервис распознавания временно недоступен: " +
-                       " | ".join(errors))
+    raise RuntimeError("Сервис распознавания временно недоступен")
 
 
 def _parse(text: str) -> list[dict]:

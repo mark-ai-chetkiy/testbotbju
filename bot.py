@@ -57,10 +57,11 @@ async def recognize(request: web.Request) -> web.Response:
 
         items = await gemini.recognize(image_bytes, mime)
         return web.json_response({"items": items}, headers=CORS)
-    except Exception as exc:
+    except Exception:
         log.exception("Не удалось распознать фото")
         return web.json_response(
-            {"error": str(exc)[:200]}, status=500, headers=CORS,
+            {"error": "Сервис распознавания временно недоступен"},
+            status=503, headers=CORS,
         )
 
 
