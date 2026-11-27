@@ -4,7 +4,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 import db
-import pet
 import render
 from nutrition import fmt, load_recipes
 
@@ -79,8 +78,4 @@ async def on_add(cb: CallbackQuery, state: FSMContext):
     r = load_recipes()[i]
     db.add_food(cb.from_user.id, f"{r['n']} (рецепт)", 0,
                 r["p"], r["f"], r["c"], r["k"])
-    react = pet.reaction(cb.from_user.id)
-    text = "🍽 Порция добавлена в дневник ✅"
-    if react:
-        text += f"\n{react}"
-    await cb.answer(text)
+    await cb.answer("🍽 Порция добавлена в дневник ✅")

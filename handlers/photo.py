@@ -6,7 +6,6 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 import config
 import db
-import pet
 import render
 import ui
 from gemini import recognize
@@ -121,9 +120,6 @@ async def on_add_all(cb: CallbackQuery, state: FSMContext):
     await state.clear()
     text = ("✅ <b>Всё добавлено в дневник!</b>\n"
             "Открой «📊 Дневник», посмотри прогресс 🎯")
-    react = pet.reaction(cb.from_user.id)
-    if react:
-        text += "\n\n" + react
     await cb.message.edit_text(text)
     await cb.answer("Готово ✅")
 

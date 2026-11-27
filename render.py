@@ -30,7 +30,7 @@ def welcome() -> str:
         "📷 <b>Фото еды</b> — посчитаю блюдо по снимку\n"
         "📖 <b>Рецепты</b> — с уже готовым БЖУ\n"
         "📊 <b>Дневник</b> — сколько съел и осталось на день\n"
-        "🐣 <b>Питомец</b> — расти тамагочи, ведя дневник\n\n"
+        "🏋️ <b>Зал</b> — чекины тренировок и челлендж клуба\n\n"
         "Начни с кнопки <b>«👤 Профиль»</b> — рассчитаю твою норму 🔥"
     )
 
@@ -44,9 +44,9 @@ def help_text() -> str:
         "📷 <b>Фото еды</b> — отправь фото тарелки, посчитаю калории\n"
         "📖 <b>Рецепты</b> — 35 блюд с БЖУ на порцию\n"
         "📊 <b>Дневник</b> — съеденное за день и остаток до нормы\n"
-        "🐣 <b>Питомец</b> — тамагочи, который растёт от твоего дневника\n"
+        "🏋️ <b>Зал</b> — прогресс тренировок и результат для тренера\n"
         "⚙️ <b>Сброс</b> — очистить дневник за сегодня\n\n"
-        "⌨️ Команды: /profile · /food · /photo · /recipes · /today · /pet · /norma · /help"
+        "⌨️ Команды: /profile · /food · /photo · /recipes · /today · /norma · /help"
     )
 
 
@@ -158,45 +158,3 @@ def recipe_list(n: int) -> str:
     )
 
 
-def pet_intro() -> str:
-    return (
-        "🐣 <b>Знакомься — твой фитнес-тамагочи!</b>\n\n"
-        "Он растёт, когда ты ведёшь дневник:\n"
-        "• 🍽 записываешь еду — капает опыт;\n"
-        "• 🎯 попадаешь в норму калорий и белка — большой бонус;\n"
-        "• 🔥 ведёшь дневник несколько дней подряд — стрик;\n"
-        "• 🥚→🐣→🐥→🐔→🦅→🐲 — эволюция за уровни.\n\n"
-        "Как его зовут? Напиши имя одним сообщением 👇"
-    )
-
-
-def pet_card(name: str, s: dict) -> str:
-    import pet as pet_mod
-
-    lines = [f"{s['emoji']} <b>{esc(name)}</b> · ур. {s['level']} "
-             f"<i>({s['title']})</i>",
-             f"{bar(s['xp_into'], s['xp_need'])} "
-             f"<b>{s['xp_into']}</b> / {s['xp_need']} XP",
-             "",
-             f"{s['mood'][0]} <i>{esc(s['mood'][1])}</i>",
-             f"🔥 Дней подряд: <b>{s['streak']}</b>  ·  "
-             f"🏆 Рекорд: <b>{s['best']}</b>",
-             "",
-             "<b>Сегодня</b>"]
-    t, target = s["today"], s["target"]
-    if target:
-        lines.append(f"🔥 {bar(t['calories'], target['calories'])} "
-                     f"<b>{fmt(t['calories'])}</b> / {target['calories']} ккал")
-        lines.append(f"🥩 {bar(t['protein'], target['protein'])} "
-                     f"<b>{fmt(t['protein'])}</b> / {target['protein']} г")
-    else:
-        lines.append(f"🔥 Съедено: <b>{fmt(t['calories'])} ккал</b>")
-
-    nxt = [(lvl, e) for lvl, e, _ in pet_mod.STAGES if lvl > s["level"]]
-    if nxt:
-        lines.append("")
-        lines.append(f"<i>Следующая форма: {nxt[0][1]} на ур. {nxt[0][0]}</i>")
-
-    lines.append("")
-    lines.append("Покорми меня: напиши «гречка 150» 🍽")
-    return "\n".join(lines)

@@ -7,7 +7,6 @@ MENU = {
     "📷 Фото еды": "photo",
     "📖 Рецепты": "recipes",
     "📊 Дневник": "today",
-    "🐣 Питомец": "pet",
     "ℹ️ Помощь": "help",
     "⚙️ Сброс": "reset",
 }
@@ -16,8 +15,8 @@ MENU = {
 def menu_kb() -> ReplyKeyboardMarkup:
     rows = [
         ["👤 Профиль", "🔍 Продукт", "📷 Фото еды"],
-        ["📖 Рецепты", "📊 Дневник", "🐣 Питомец"],
-        ["ℹ️ Помощь", "⚙️ Сброс"],
+        ["📖 Рецепты", "📊 Дневник", "ℹ️ Помощь"],
+        ["⚙️ Сброс"],
     ]
     return ReplyKeyboardMarkup(
         resize_keyboard=True,
@@ -51,7 +50,7 @@ async def try_command(message, state) -> bool:
     text = (message.text or "").strip()
     if not text.startswith("/"):
         return False
-    from handlers import start, profile, food, photo, recipes, diary, pet  # локальный импорт
+    from handlers import start, profile, food, photo, recipes, diary  # локальный импорт
     parts = text[1:].split()
     cmd = parts[0].split("@")[0].lower()
     args = " ".join(parts[1:])
@@ -66,7 +65,6 @@ async def try_command(message, state) -> bool:
         "recipes": lambda: recipes.cmd_recipes(message, state),
         "today": lambda: diary.cmd_today(message, state),
         "reset": lambda: diary.cmd_reset(message, state),
-        "pet": lambda: pet.cmd_pet(message, state),
     }
     if cmd in actions:
         await actions[cmd]()
@@ -75,14 +73,13 @@ async def try_command(message, state) -> bool:
 
 
 async def dispatch(key: str, message, state: FSMContext):
-    from handlers import start, profile, food, photo, recipes, diary, pet  # локальный импорт
+    from handlers import start, profile, food, photo, recipes, diary  # локальный импорт
     actions = {
         "profile": profile.cmd_profile,
         "food": food.cmd_food,
         "photo": photo.cmd_photo,
         "recipes": recipes.cmd_recipes,
         "today": diary.cmd_today,
-        "pet": pet.cmd_pet,
         "help": start.cmd_help,
         "reset": diary.cmd_reset,
     }

@@ -81,9 +81,6 @@ async def main() -> None:
 
     # /start
     await send("/start")
-    # питомец: имя -> карточка
-    await send("🐣 Питомец")
-    await send("Бублик")
     # профиль
     await send("👤 Профиль")
     await send("👦 Парень")
@@ -103,8 +100,6 @@ async def main() -> None:
     await cb("rec:0:0")
     await cb("radd:0")
     await cb("rp:0")
-    # питомец после еды
-    await send("🐣 Питомец")
     # дневник
     await send("📊 Дневник")
     # норма

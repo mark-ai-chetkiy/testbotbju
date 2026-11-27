@@ -43,11 +43,6 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_diary_user_day ON diary(user_id, day);
-            CREATE TABLE IF NOT EXISTS pets (
-                user_id INTEGER PRIMARY KEY,
-                name TEXT,
-                created_at TEXT DEFAULT (datetime('now'))
-            );
             """
         )
         c.commit()
@@ -144,25 +139,4 @@ def all_diary(user_id) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_pet(user_id) -> dict | None:
-    row = _get().execute("SELECT * FROM pets WHERE user_id=?", (user_id,)).fetchone()
-    return dict(row) if row else None
-
-
-def create_pet(user_id, name: str) -> dict:
-    with _lock:
-        con = _get()
-        con.execute("INSERT OR IGNORE INTO pets(user_id, name) VALUES(?,?)",
-                    (user_id, name))
-        con.commit()
-    return get_pet(user_id)
-
-
-def set_pet_name(user_id, name: str):
-    with _lock:
-        con = _get()
-        con.execute("INSERT INTO pets(user_id, name) VALUES(?,?) "
-                    "ON CONFLICT(user_id) DO UPDATE SET name=excluded.name",
-                    (user_id, name))
-        con.commit()
 

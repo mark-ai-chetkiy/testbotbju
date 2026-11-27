@@ -7,7 +7,6 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 import db
-import pet
 import render
 import ui
 from nutrition import fmt, scale, search_products
@@ -129,8 +128,5 @@ async def on_add(cb: CallbackQuery, state: FSMContext):
                 item["p"], item["f"], item["c"], item["k"])
     await state.clear()
     text = "✅ <b>Добавлено в дневник</b>\n\n" + render.food_card(item)
-    react = pet.reaction(cb.from_user.id)
-    if react:
-        text += "\n\n" + react
     await cb.message.edit_text(text)
     await cb.answer("Добавлено! ✅")

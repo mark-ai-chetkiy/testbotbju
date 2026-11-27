@@ -5,7 +5,6 @@
   const KEYS = {
     diary: "bju_diary_v1",
     profile: "bju_profile_v1",
-    petName: "bju_pet_name_v1",
     source: "bju_source_v1",
     club: "bju_club_v1",
     checkins: "bju_checkins_v1",
@@ -23,21 +22,11 @@
     keep: { coef: 1.00, proteinPerKg: 1.6, fatRatio: 0.28 },
     gain: { coef: 1.12, proteinPerKg: 1.8, fatRatio: 0.30 },
   };
-  const STAGES = [
-    { min: 1, emoji: "\u{1F95A}", title: "Яйцо" },
-    { min: 3, emoji: "\u{1F423}", title: "Цыплёнок" },
-    { min: 5, emoji: "\u{1F425}", title: "Птенец" },
-    { min: 8, emoji: "\u{1F424}", title: "Птенец-крепыш" },
-    { min: 12, emoji: "\u{1F414}", title: "Взрослый" },
-    { min: 17, emoji: "\u{1F985}", title: "Орёл" },
-    { min: 22, emoji: "\u{1F432}", title: "Легенда" },
-  ];
-
   const tg = window.Telegram && window.Telegram.WebApp;
   const state = {
     products: [], recipes: [], diary: [], profile: null,
     club: null, checkins: [], aiItems: [],
-    petName: "Тёма", source: "", selected: null, tab: "calc",
+    source: "", selected: null, tab: "calc",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -145,16 +134,11 @@
     setTab("diary");
   }
 
-  /* ---- pet (ported from pet.py) ---- */
+  /* ---- прогресс: уровень и серия ---- */
   function levelInfo(xp) {
     let lvl = 1, need = 100, cum = 0;
     while (xp >= cum + need) { cum += need; lvl += 1; need = 100 * lvl; }
     return { level: lvl, into: xp - cum, need: need };
-  }
-  function stageFor(level) {
-    let stage = STAGES[0];
-    STAGES.forEach((s) => { if (level >= s.min) stage = s; });
-    return stage;
   }
   function qualifies(tot, target) {
     if (!tot || tot.calories <= 0) return false;
@@ -163,19 +147,7 @@
       tot.calories <= 1.15 * target.calories &&
       tot.protein >= 0.7 * target.protein;
   }
-  function moodFor(tdy, target) {
-    if (tdy.items === 0) return ["\u{1F61A}", "Голодный — покорми меня, запиши еду!"];
-    if (!target) return ["\u{1F642}", "Сыт и доволен. Заполни профиль — и я начну следить за нормой!"];
-    const ratio = target.calories ? tdy.calories / target.calories : 1;
-    const proteinOk = tdy.protein >= 0.8 * target.protein;
-    if (ratio < 0.5) return ["\u{1F61A}", "Ещё мало еды — я не наелся"];
-    if (ratio < 0.85) return ["\u{1F642}", "Неплохо, но можно добрать калорий"];
-    if (ratio <= 1.05 && proteinOk) return ["\u{1F600}", "Сыт, счастлив и в норме!"];
-    if (ratio <= 1.15) return ["\u{1F60E}", "Отличный день, держим курс"];
-    if (ratio <= 1.35) return ["\u{1F605}", "Меня слегка перекормили"];
-    return ["\u{1F922}", "Перекорм! Завтра полегче, ладно?"];
-  }
-  function petStats() {
+  function progressStats() {
     const days = groupDays();
     const target = calcTargets(state.profile);
     let xp = 0;
@@ -206,7 +178,7 @@
     });
     xp += Math.min(5 * streak, 50);
 
-    // Чекины в зале тоже кормят питомца: +15 XP за визит, +5 если в тот же день был дневник.
+    // Визиты в зал и дни с дневником повышают уровень.
     (state.checkins || []).forEach((day) => {
       xp += 15;
       if (days[day] && days[day].items) xp += 5;
@@ -214,11 +186,9 @@
 
     const li = levelInfo(xp);
     const tdy = days[today] || { items: 0, protein: 0, fat: 0, calories: 0 };
-    const m = moodFor(tdy, target);
     return {
       xp: xp, level: li.level, into: li.into, need: li.need,
-      stage: stageFor(li.level), streak: streak, best: best,
-      today: tdy, target: target, mood: m,
+      streak: streak, best: best, today: tdy, target: target,
     };
   }
 
@@ -462,26 +432,21 @@
     $("history").innerHTML = hist || '<p class="empty">Заполняй дневник — здесь появится история.</p>';
   }
 
-  function renderPet() {
-    const s = petStats();
+  function renderProgress() {
+    const s = progressStats();
     const pct = Math.min(100, Math.round(s.into / s.need * 100));
-    $("pet-chip").innerHTML = s.stage.emoji + ' <span>Lv.' + s.level + '</span>';
-    $("pet-card").innerHTML =
-      '<div class="pet-hero">' +
-      '<div class="pet-emoji">' + s.stage.emoji + '</div>' +
-      '<div class="pet-name">' + esc(state.petName) + ' · ' + esc(s.stage.title) + '</div>' +
-      '<div class="pet-mood">' + s.mood[0] + ' ' + esc(s.mood[1]) + '</div>' +
-      '<div class="pet-level"><div class="progress-label"><span>Уровень ' + s.level +
-      '</span><span>' + s.into + ' / ' + s.need + ' XP</span></div>' +
-      '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div></div>' +
-      '<div class="stage-line">' + STAGES.map((st) =>
-        '<span class="stage' + (s.level >= st.min ? " reached" : "") + '" title="' +
-        esc(st.title) + '">' + st.emoji + '</span>').join("") + '</div></div>' +
-      '<div class="card"><div class="stat-grid">' +
-      '<div class="stat-box"><div class="stat-value">' + s.streak + '</div><div class="stat-label">стрик, дней</div></div>' +
-      '<div class="stat-box"><div class="stat-value">' + s.best + '</div><div class="stat-label">лучший стрик</div></div>' +
-      '<div class="stat-box"><div class="stat-value">' + s.xp + '</div><div class="stat-label">всего XP</div></div></div>' +
-      '<p class="hint">Питомец растёт от записей в дневнике и чекинов в зале: +5 XP за порцию, +15 XP за визит в зал, бонусы за день в цели и за серию дней.</p></div>';
+    $("progress-card").innerHTML =
+      '<div class="card">' +
+        '<div class="section-head"><h2>📈 Мой прогресс</h2><span class="macro-pill k">Уровень ' +
+        s.level + '</span></div>' +
+        progress("До следующего уровня", s.into, s.need) +
+        '<div class="stat-grid">' +
+          '<div class="stat-box"><div class="stat-value">' + s.streak + '</div><div class="stat-label">серия, дней</div></div>' +
+          '<div class="stat-box"><div class="stat-value">' + s.best + '</div><div class="stat-label">лучшая серия</div></div>' +
+          '<div class="stat-box"><div class="stat-value">' + s.xp + '</div><div class="stat-label">всего очков</div></div>' +
+        '</div>' +
+        '<p class="hint">Очки начисляются за записи в дневнике, дни в норме и тренировки. Всё считается на твоём телефоне.</p>' +
+      '</div>';
   }
 
   function renderRecipes() {
@@ -519,7 +484,6 @@
       '<p class="hint">Углеводы: ' + t.carbs + ' г · базовый обмен: ' + t.bmr +
       ' ккал · с активностью: ' + t.tdee + ' ккал</p>'
       : '<p class="empty">Норма ещё не посчитана — заполни данные выше.</p>';
-    $("pet-name").value = state.petName;
     if (state.source) {
       $("source-note").textContent = "Источник: " + state.source + " · данные хранятся только на этом устройстве";
     }
@@ -555,7 +519,7 @@
         '<button class="primary" id="checkin">' +
           (s.checkedToday ? "✅ Ты уже в зале сегодня — нажми, чтобы отменить" : "🏋️ Я в зале — отметить тренировку") +
         '</button>' +
-        '<p class="hint">За каждый визит питомец получает +15 XP, а если в этот день есть запись в дневнике — ещё +5.</p>' +
+        '<p class="hint">Каждая тренировка повышает твой уровень: +15 очков за визит и ещё +5, если в этот день есть запись в дневнике.</p>' +
         '<div class="row actions">' +
           '<button class="ghost" id="share-club">Поделиться</button>' +
           '<button class="ghost" id="reset-club">Заново</button>' +
@@ -605,7 +569,7 @@
   }
 
   function renderAll() {
-    renderResults(); renderDiary(); renderPet(); renderClub(); renderProfile(); renderRecipes();
+    renderResults(); renderDiary(); renderProgress(); renderClub(); renderProfile(); renderRecipes();
     renderAiResult(); renderPortionPreview();
   }
 
@@ -674,12 +638,6 @@
       renderAll();
       if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
     });
-    $("save-pet-name").addEventListener("click", () => {
-      const v = $("pet-name").value.trim().slice(0, 20);
-      state.petName = v || "Тёма";
-      save(KEYS.petName, state.petName);
-      renderAll();
-    });
   }
 
   async function init() {
@@ -700,7 +658,6 @@
     state.profile = load(KEYS.profile, null);
     state.club = load(KEYS.club, null);
     state.checkins = load(KEYS.checkins, []);
-    state.petName = load(KEYS.petName, "Тёма");
 
     try {
       const [products, recipes] = await Promise.all([
