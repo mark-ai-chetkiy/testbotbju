@@ -50,6 +50,8 @@ bju-bot/
 ├── data/                 # база продуктов и рецептов
 ├── docs/                 # статический Mini App: index.html, styles.css, app.js, data/
 ├── CHANNEL.md            # готовый пакет Telegram-канала
+├── TIKTOK.md             # сценарии и био для продвижения в TikTok
+├── CONTENT_PLAN.md       # контент-план на 30 дней
 ├── Dockerfile, render.yaml
 └── .env.example
 ```
