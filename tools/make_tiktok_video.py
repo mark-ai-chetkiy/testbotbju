@@ -1,12 +1,18 @@
 """Собирает первый вертикальный ролик для TikTok: фото еды → расчёт БЖУ.
 
 Запуск: python3 tools/make_tiktok_video.py
-Нужен Pillow, imageio-ffmpeg и macOS say (голос Milena).
+Нужны Pillow, imageio-ffmpeg и Piper с русской моделью Ирины:
+    ~/.cache/bju-piper/ru_RU-irina-medium.onnx
+    ~/.cache/bju-piper/ru_RU-irina-medium.onnx.json
+
+Модель скачивается один раз:
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/
 """
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 import imageio_ffmpeg
@@ -16,8 +22,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "tiktok", "01_photo_to_bju.mp4")
 
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
-AIFF = "/tmp/tiktok_voice.aiff"
-M4A = "/tmp/tiktok_voice.m4a"
+VOICE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "bju-piper")
+MODEL = os.path.join(VOICE_DIR, "ru_RU-irina-medium.onnx")
+CONFIG = MODEL + ".json"
+WAV = "/tmp/tiktok_voice_irina.wav"
+M4A = "/tmp/tiktok_voice_irina.m4a"
 VOICE = ("Сфотографировал обед и получил БЖУ без таблиц. "
          "Открыл мини-приложение, нажал рассчитать по фото. "
          "ИИ оценил порцию и посчитал белки, жиры и углеводы. "
@@ -226,8 +235,21 @@ def render_frame(t, duration):
 
 def prepare_audio() -> float:
     if not os.path.exists(M4A):
-        subprocess.run(["say", "-v", "Milena", "-r", "165", "-o", AIFF, VOICE], check=True)
-        subprocess.run([FFMPEG, "-y", "-i", AIFF, "-c:a", "aac", "-b:a", "128k", M4A],
+        if not os.path.exists(MODEL) or not os.path.exists(CONFIG):
+            raise RuntimeError(
+                "Нет модели Piper. Скачай ru_RU-irina-medium.onnx и .json "
+                f"в {VOICE_DIR} (ссылка в шапке скрипта)."
+            )
+        text_file = WAV + ".txt"
+        with open(text_file, "w", encoding="utf-8") as f:
+            f.write(VOICE)
+        subprocess.run([
+            sys.executable, "-m", "piper",
+            "-m", MODEL, "-c", CONFIG,
+            "-i", text_file, "-f", WAV,
+            "--length_scale", "0.95",
+        ], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run([FFMPEG, "-y", "-i", WAV, "-c:a", "aac", "-b:a", "128k", M4A],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     out = subprocess.run([FFMPEG, "-i", M4A], capture_output=True, text=True).stderr
     m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", out)
